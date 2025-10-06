@@ -24,6 +24,10 @@
     const deleteFileClassName = "BtnDeleteFile";
     const uploadFileClassname = "BtnUploadFile";
     const viewerFileClassname = "BtnViewerFile";
+    const compressedExtensions = [
+        '.7z', '.zip', '.rar', '.gz', '.tar', '.tbz2', '.tgz', '.bz2', '.lz', '.lz4','.txz',
+        '.xz', '.z', '.zst', '.zstd', '.war', '.ear', '.jar','.apk', '.arj', '.ace', '.cab',
+    ];
 
     const isString = item => typeof item === "string";
 
@@ -294,8 +298,10 @@
             }
 
             const attachment = parent.ECM.attachmentTable.getRow(attachmentIndex);
+            const physicalFileName = attachment.physicalFileName.toLowerCase();
+            const isCompressedFile = compressedExtensions.some(extension => physicalFileName.endsWith(extension));
 
-            if (attachment.documentId) {
+            if (attachment.documentId && !isCompressedFile) {
                 parent.WKFViewAttachment.openAttachmentView(parent.WCMAPI.userCode, attachment.documentId, attachment.version);
             } else {
                 parent.WKFViewAttachment.downloadAttach([attachmentIndex]);

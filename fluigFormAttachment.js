@@ -29,6 +29,9 @@
         '.xz', '.z', '.zst', '.zstd', '.war', '.ear', '.jar','.apk', '.arj', '.ace', '.cab',
     ];
 
+    // Mesmo período editável usado em enableFields.js e no botão "Remover item" da tabela
+    const deletableActivities = ['0', '4', '22'];
+
     const isString = item => typeof item === "string";
 
     /**
@@ -187,7 +190,7 @@
             const hasFileSelected = this.#attachmentFilename.length !== 0;
             const canShowActionButton = this.#canDisplayActionButton();
 
-            return `<button type="button" class="${pluginName}BtnAction ${pluginName}${deleteFileClassName} btn btn-danger btn-sm ${(canShowActionButton && hasFileSelected) ? '' : 'hide'}" title="Remover Anexo"><i class="flaticon flaticon-trash icon-sm"></i></button>`
+            return `<button type="button" class="${pluginName}BtnAction ${pluginName}${deleteFileClassName} btn btn-danger btn-sm ${(this.#canDeleteAttachment() && hasFileSelected) ? '' : 'hide'}" title="Remover Anexo"><i class="flaticon flaticon-trash icon-sm"></i></button>`
                 + `<button type="button" class="${pluginName}BtnAction ${pluginName}${uploadFileClassname} btn btn-success btn-sm ${(canShowActionButton && !hasFileSelected) ? '' : 'hide'}" title="Enviar Anexo"><i class="flaticon flaticon-upload icon-sm"></i></button>`
                 + `<button type="button" class="${pluginName}${viewerFileClassname} btn btn-info btn-sm ${hasFileSelected ? '' : 'hide'}" title="Visualizar Anexo"><i class="flaticon flaticon-view icon-sm"></i></button>`
             ;
@@ -197,12 +200,21 @@
             const element = this.#input.get(0);
 
             return this.#settings.showActionButton
-                && parent.ECM.workflowView.userPermissions.indexOf("P") >= 0
+                && parent.ECM.workflowView.userPermissions.includes("P")
                 && location.href.includes('ManagerMode')
                 && !location.href.includes('token')
                 && element.nodeName.toLowerCase() === "input"
                 && !element.disabled
             ;
+        }
+
+        /**
+         * Indica se o anexo pode ser excluído na atividade atual
+         *
+         * @returns {boolean}
+         */
+        #canDeleteAttachment() {
+            return this.#canDisplayActionButton() && deletableActivities.includes($('#vh_WKNumState').val());
         }
 
         #changeButtonsState() {
@@ -211,7 +223,7 @@
             if (this.#canDisplayActionButton()) {
                 if (hasFileSelected) {
                     this.#container.find(`.${pluginName}${uploadFileClassname}`).addClass("hide");
-                    this.#container.find(`.${pluginName}${deleteFileClassName}`).removeClass("hide");
+                    this.#container.find(`.${pluginName}${deleteFileClassName}`).toggleClass("hide", !this.#canDeleteAttachment());
                 } else {
                     this.#container.find(`.${pluginName}${deleteFileClassName}`).addClass("hide");
                     this.#container.find(`.${pluginName}${uploadFileClassname}`).removeClass("hide");
@@ -228,7 +240,7 @@
         }
 
         #confirmDeleteAttachment() {
-            if (!this.#canDisplayActionButton()) {
+            if (!this.#canDeleteAttachment()) {
                 return;
             }
 
@@ -283,7 +295,8 @@
         }
 
         #viewAttachment() {
-            const attachmentIndex = parent.ECM.attachmentTable.getData().findIndex(
+            const attachments = parent.ECM.attachmentTable.getData();
+            const attachmentIndex = attachments.findIndex(
                 attachment => attachment.description === this.#attachmentFilename
             );
 
@@ -297,8 +310,9 @@
                 return;
             }
 
-            const attachment = parent.ECM.attachmentTable.getRow(attachmentIndex);
-            const physicalFileName = attachment.physicalFileName.toLowerCase();
+            const attachment = attachments[attachmentIndex];
+            console.log("fluigFormAttachment - attachment debug:", attachment);
+            const physicalFileName = (attachment.physicalFileName || "").toLowerCase();
             const isCompressedFile = compressedExtensions.some(extension => physicalFileName.endsWith(extension));
 
             if (attachment.documentId && !isCompressedFile) {
@@ -326,8 +340,6 @@
             const methodName = options;
             const methodArgs = Array.prototype.slice.call(arguments, 1);
 
-            let returnedValue = undefined;
-
             this.each(function () {
                 let pluginData = $.data(this, pluginName);
 
@@ -340,7 +352,7 @@
                     return;
                 }
 
-                returnedValue = pluginData[methodName](...methodArgs);
+                let returnedValue = pluginData[methodName](...methodArgs);
 
                 if (returnedValue !== undefined) {
                     return false;
@@ -360,16 +372,16 @@
         });
     };
 
-    if (!parent.WKFViewAttachment || !parent.ECM || !parent.ECM.attachmentTable) {
-        return;
-    }
+    $(function () {
+        if (!parent.WKFViewAttachment || !parent.ECM || !parent.ECM.attachmentTable) {
+            return;
+        }
 
-    const loading = FLUIGC.loading(window, {
-        title: "Aguarde",
-        textMessage: "Enviando arquivo",
-    })
+        const loading = FLUIGC.loading(window, {
+            title: "Aguarde",
+            textMessage: "Enviando arquivo",
+        })
 
-    $(() => {
         // Oculta aba anexos
         $("#tab-attachments", parent.document).hide();
 
@@ -384,7 +396,7 @@
                 }
 
                 if (parent.ECM.newAttachmentsDocs.length
-                    && parent.ECM.newAttachmentsDocs.findIndex(attachment => attachment.name === file.name) !== -1
+                    && parent.ECM.newAttachmentsDocs.some(attachment => attachment.name === file.name)
                 ) {
                     return;
                 }
@@ -408,14 +420,13 @@
             });
 
         parent.$(document).on(`fileuploadstop.${pluginName}`, () => loading.hide());
-    });
 
-
-$("head").append(`<style>
+        $("head").append(`<style>
 .${pluginName}Component { display: flex; align-items: center; flex-wrap: nowrap; }
 .${pluginName}Component input { border-top-right-radius: 0 !important; border-bottom-right-radius: 0 !important; }
 .${pluginName}Component_buttons { display: flex; align-items: center; justify-content: flex-end; }
 .${pluginName}Component_buttons .btn { outline: none !important; outline-offset: unset !important; border-radius: 0 !important; height: 32px; }
 </style>`);
+    });
 
 }(jQuery));
